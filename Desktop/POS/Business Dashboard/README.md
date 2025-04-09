@@ -52,7 +52,7 @@ flowchart LR
     ER -->|"Update Dashboard"| BD
     BD --> DV
     DV -->|"Access via /dashboard route"| AD
-    CT <--|"Emit Result"| ER
+    ER -->|"Emit Result"| CT
 
     %% Apply styling to nodes
     classDef terminal fill:#e6f7ff,stroke:#1890ff,stroke-width:2px
