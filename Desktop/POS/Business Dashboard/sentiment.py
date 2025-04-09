@@ -1,12 +1,15 @@
+import os
 from openai import OpenAI
+from dotenv import load_dotenv
 import logging
 
 logger = logging.getLogger(__name__)
 
-# Initialize OpenAI client with API key
-client = OpenAI(
-    api_key="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"
-)
+# Load environment variables
+load_dotenv()
+
+# Initialize OpenAI client with API key from environment variable
+client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
 def analyze_sentiment(text):
     """
@@ -14,72 +17,67 @@ def analyze_sentiment(text):
     Returns: "Positive", "Neutral", or "Negative"
     """
     try:
-        prompt = f"""Analyze the sentiment of this restaurant feedback. Consider food quality, taste, service, and overall experience.
-        Respond with EXACTLY one word: 'Positive', 'Neutral', or 'Negative'.
-        
-        Guidelines:
-        - Complaints about food quality (too salty, undercooked, overcooked) are Negative
-        - Service issues are Negative
-        - Price complaints are Negative
-        - Mixed feedback with both positive and negative points is Neutral
-        - Only clearly positive experiences are Positive
-        
-        Feedback: {text}
-        
-        Sentiment:"""
-
+        # First try using OpenAI
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "You are a restaurant feedback analyzer that responds with exactly one word."},
-                {"role": "user", "content": prompt}
+                {"role": "system", "content": """You are a sentiment analyzer for restaurant feedback. 
+                Analyze the sentiment based on:
+                - Food quality and taste
+                - Service quality
+                - Overall experience
+                
+                Guidelines:
+                - Positive: Excellent food, great service, wonderful experience, highly recommended
+                - Neutral: Okay food, decent service, acceptable experience
+                - Negative: Poor food quality, bad service, complaints about taste, temperature, or preparation
+                
+                Examples:
+                - "Food was delicious and service was great" -> Positive
+                - "The food was okay but service was slow" -> Neutral
+                - "Food was too salty and service was terrible" -> Negative
+                
+                Respond with ONLY one word: Positive, Neutral, or Negative."""},
+                {"role": "user", "content": text}
             ],
-            max_tokens=10,
-            temperature=0.3
+            temperature=0.3,
+            max_tokens=10
         )
         
-        sentiment = response.choices[0].message.content.strip()
+        sentiment = response.choices[0].message.content.strip().lower()
         
-        # Ensure we only return valid sentiment values
-        if sentiment not in ["Positive", "Neutral", "Negative"]:
-            return "Neutral"
-        
-        return sentiment
-        
+        # Validate the response
+        if sentiment in ['positive', 'neutral', 'negative']:
+            return sentiment.capitalize()
+            
     except Exception as e:
-        logger.error(f"Error in sentiment analysis: {str(e)}")
-        # Enhanced fallback: check for restaurant-specific keywords
-        text = text.lower()
-        positive_words = [
-            'good', 'great', 'excellent', 'amazing', 'delicious', 'wonderful', 'fantastic',
-            'love', 'best', 'fresh', 'tasty', 'perfect', 'friendly', 'attentive', 'quick',
-            'recommend', 'enjoyed', 'clean', 'authentic', 'favorite'
-        ]
-        negative_words = [
-            'bad', 'poor', 'terrible', 'awful', 'horrible', 'worst', 'disappointed',
-            'not good', 'slow', 'cold', 'undercooked', 'overcooked', 'salty', 'bland',
-            'rude', 'dirty', 'expensive', 'wait', 'wrong', 'missing', 'late', 'mess',
-            'dry', 'tough', 'tasteless', 'mediocre', 'waste', 'never again'
-        ]
+        logger.error(f"OpenAI API error: {str(e)}")
+    
+    # Fallback to keyword-based analysis if OpenAI fails
+    positive_words = {'good', 'great', 'excellent', 'amazing', 'wonderful', 'delicious', 'perfect', 'love', 'enjoy', 'fantastic', 'best', 'outstanding', 'favorite', 'recommend', 'awesome', 'tasty', 'yummy', 'satisfied', 'happy', 'pleased', 'impressed', 'exceeded', 'excellent', 'perfect', 'outstanding', 'amazing', 'wonderful', 'fantastic', 'great', 'good', 'delicious', 'tasty', 'yummy', 'love', 'enjoy', 'recommend', 'satisfied', 'happy', 'pleased', 'impressed'}
+    negative_words = {'bad', 'poor', 'terrible', 'awful', 'horrible', 'disappointing', 'worst', 'hate', 'dislike', 'unpleasant', 'unsatisfactory', 'mediocre', 'average', 'okay', 'fine', 'meh', 'not good', 'could be better', 'salty', 'undercooked', 'overcooked', 'cold', 'spicy', 'bland', 'dry', 'tough', 'chewy', 'soggy', 'burnt', 'raw', 'frozen', 'expired', 'old', 'stale', 'rotten', 'moldy', 'unfresh', 'unclean', 'dirty', 'unsanitary', 'slow', 'unfriendly', 'rude', 'impolite', 'unprofessional', 'inattentive', 'ignored', 'forgotten', 'wrong order', 'mistake', 'error', 'problem', 'issue', 'complaint', 'disappointed', 'frustrated', 'angry', 'upset', 'unhappy', 'dissatisfied', 'unpleasant', 'unsatisfactory', 'mediocre', 'average', 'okay', 'fine', 'meh', 'not good', 'could be better'}
+    
+    text = text.lower()
+    
+    # Check for negations
+    negations = {'not', "n't", 'no', 'never', 'none', 'neither', 'nor'}
+    words = text.split()
+    
+    positive_count = 0
+    negative_count = 0
+    
+    for i, word in enumerate(words):
+        # Check if the word is a negation
+        is_negated = any(neg in words[max(0, i-2):i] for neg in negations)
         
-        # Convert text to words for more accurate matching
-        words = text.split()
-        
-        # Count positive and negative matches
-        pos_count = sum(1 for word in positive_words if word in text)
-        neg_count = sum(1 for word in negative_words if word in text)
-        
-        # Check for negations (e.g., "not good", "wasn't great")
-        negations = ['not', 'no', 'never', "wasn't", "weren't", "isn't", "aren't", "hadn't", "doesn't"]
-        for i, word in enumerate(words[:-1]):
-            if word in negations:
-                # If next word is positive, count it as negative instead
-                if any(pos_word in words[i+1] for pos_word in positive_words):
-                    pos_count -= 1
-                    neg_count += 1
-        
-        if pos_count > neg_count:
-            return "Positive"
-        elif neg_count > pos_count:
-            return "Negative"
+        if word in positive_words:
+            positive_count += -1 if is_negated else 1
+        elif word in negative_words:
+            negative_count += -1 if is_negated else 1
+    
+    if positive_count > negative_count:
+        return "Positive"
+    elif negative_count > positive_count:
+        return "Negative"
+    else:
         return "Neutral" 
