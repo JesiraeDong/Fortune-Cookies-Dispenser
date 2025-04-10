@@ -47,7 +47,7 @@ graph LR
     ER -->|"Update Dashboard"| BD
     BD --> DV
     DV -->|"Access via /dashboard route"| AD
-    CT <--|"Emit Result"| ER
+    ER -->|"Emit Result"| CT
 ```
 
 ## Setup
