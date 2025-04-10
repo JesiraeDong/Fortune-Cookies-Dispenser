@@ -14,17 +14,14 @@ A real-time sentiment analysis dashboard for restaurant feedback using Flask, So
 ## Customer Feedback Flow Chart
 
 ```mermaid
-flowchart LR
-    %% Define subgraphs with styling
+graph LR
     subgraph CustomerSide["Customer Side"]
-        style CustomerSide fill:#e6f7ff,stroke:#1890ff,stroke-width:2px
         CT["Customer Terminal"]
         EF["Enter Feedback"]
         SF["Send Feedback"]
     end
 
     subgraph Backend["Backend"]
-        style Backend fill:#f6ffed,stroke:#52c41a,stroke-width:2px
         FSS["Flask SocketIO Server"]
         RF["Receive Feedback"]
         SA["Sentiment Analysis"]
@@ -34,13 +31,11 @@ flowchart LR
     end
 
     subgraph BusinessSide["Business Side"]
-        style BusinessSide fill:#fff1f0,stroke:#f5222d,stroke-width:2px
         BD["Business Dashboard"]
         DV["Display Visualizations"]
         AD["Access Dashboard"]
     end
 
-    %% Define connections with labels
     CT --> EF
     EF --> SF
     SF -->|"Feedback via WebSocket"| FSS
@@ -53,18 +48,6 @@ flowchart LR
     BD --> DV
     DV -->|"Access via /dashboard route"| AD
     CT <--|"Emit Result"| ER
-
-    %% Apply styling to nodes
-    classDef terminal fill:#e6f7ff,stroke:#1890ff,stroke-width:2px
-    classDef server fill:#f6ffed,stroke:#52c41a,stroke-width:2px
-    classDef dashboard fill:#fff1f0,stroke:#f5222d,stroke-width:2px
-    classDef process fill:#f9f0ff,stroke:#722ed1,stroke-width:1px
-
-    %% Apply classes to nodes
-    class CT,EF,SF terminal
-    class FSS server
-    class RF,SA,STF,ER,TS process
-    class BD,DV,AD dashboard
 ```
 
 ## Setup
