@@ -13,26 +13,11 @@ A real-time sentiment analysis dashboard for restaurant feedback using Flask, So
 
 ## System Architecture
 
-```
-+------------------+     +------------------+     +------------------+
-|   Customer Side  |     |     Backend      |     |  Business Side   |
-+------------------+     +------------------+     +------------------+
-|                  |     |                  |     |                  |
-| Customer Terminal|---->| Flask Server     |---->| Business Dashboard|
-|                  |     |                  |     |                  |
-| Enter Feedback   |     | Receive Feedback |     | Display Visuals  |
-|                  |     |                  |     |                  |
-| Send Feedback    |     | Sentiment Analysis|     | Access Dashboard |
-|                  |     |                  |     |                  |
-|                  |     | Store Feedback   |     |                  |
-|                  |     |                  |     |                  |
-|                  |     | Emit Result      |     |                  |
-|                  |     |                  |     |                  |
-|                  |     | Trigger Servo    |     |                  |
-|                  |     |                  |     |                  |
-|                  |<----|                  |     |                  |
-+------------------+     +------------------+     +------------------+
-```
+The system consists of three main components:
+
+1. **Customer Side**: Where customers enter and submit feedback
+2. **Backend**: Processes feedback, performs sentiment analysis, and stores data
+3. **Business Side**: Displays visualizations and analytics for business owners
 
 ## Setup
 
