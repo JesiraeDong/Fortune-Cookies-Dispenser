@@ -11,30 +11,22 @@ A real-time sentiment analysis dashboard for restaurant feedback using Flask, So
 - WebSocket-based live updates
 - Responsive dashboard design
 
-## Customer Feedback Flow Chart
+## System Flow
 
 ```mermaid
 graph TD
-    subgraph CustomerSide
-        CT[Customer Terminal]
-        EF[Enter Feedback]
-        SF[Send Feedback]
-    end
-
-    subgraph Backend
-        FSS[Flask SocketIO Server]
-        RF[Receive Feedback]
-        SA[Sentiment Analysis]
-        STF[Store Feedback]
-        ER[Emit Result]
-        TS[Trigger Servo]
-    end
-
-    subgraph BusinessSide
-        BD[Business Dashboard]
-        DV[Display Visualizations]
-        AD[Access Dashboard]
-    end
+    CT[Customer Terminal]
+    EF[Enter Feedback]
+    SF[Send Feedback]
+    FSS[Flask Server]
+    RF[Receive Feedback]
+    SA[Sentiment Analysis]
+    STF[Store Feedback]
+    ER[Emit Result]
+    TS[Trigger Servo]
+    BD[Business Dashboard]
+    DV[Display Visualizations]
+    AD[Access Dashboard]
 
     CT --> EF
     EF --> SF
