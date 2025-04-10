@@ -15,39 +15,39 @@ A real-time sentiment analysis dashboard for restaurant feedback using Flask, So
 
 ```mermaid
 graph LR
-    subgraph CustomerSide["Customer Side"]
-        CT["Customer Terminal"]
-        EF["Enter Feedback"]
-        SF["Send Feedback"]
+    subgraph CustomerSide
+        CT[Customer Terminal]
+        EF[Enter Feedback]
+        SF[Send Feedback]
     end
 
-    subgraph Backend["Backend"]
-        FSS["Flask SocketIO Server"]
-        RF["Receive Feedback"]
-        SA["Sentiment Analysis"]
-        STF["Store Feedback"]
-        ER["Emit Result"]
-        TS["Trigger Servo"]
+    subgraph Backend
+        FSS[Flask SocketIO Server]
+        RF[Receive Feedback]
+        SA[Sentiment Analysis]
+        STF[Store Feedback]
+        ER[Emit Result]
+        TS[Trigger Servo]
     end
 
-    subgraph BusinessSide["Business Side"]
-        BD["Business Dashboard"]
-        DV["Display Visualizations"]
-        AD["Access Dashboard"]
+    subgraph BusinessSide
+        BD[Business Dashboard]
+        DV[Display Visualizations]
+        AD[Access Dashboard]
     end
 
     CT --> EF
     EF --> SF
-    SF -->|"Feedback via WebSocket"| FSS
+    SF --> FSS
     FSS --> RF
-    RF -->|"Sentiment Analysis via OpenAI"| SA
-    SA -->|"Store in SQLite"| STF
+    RF --> SA
+    SA --> STF
     STF --> ER
-    ER -->|"Trigger Servo (optional)"| TS
-    ER -->|"Update Dashboard"| BD
+    ER --> TS
+    ER --> BD
     BD --> DV
-    DV -->|"Access via /dashboard route"| AD
-    ER -->|"Emit Result"| CT
+    DV --> AD
+    ER --> CT
 ```
 
 ## Setup
