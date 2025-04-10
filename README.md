@@ -13,7 +13,7 @@ A real-time sentiment analysis dashboard for restaurant feedback using Flask, So
 
 ## System Architecture
 
-![System Architecture](system_architecture.png)
+![System Architecture](diagram.png)
 
 ## Setup
 
