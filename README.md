@@ -14,7 +14,7 @@ A real-time sentiment analysis dashboard for restaurant feedback using Flask, So
 ## Customer Feedback Flow Chart
 
 ```mermaid
-graph LR
+graph TD
     subgraph CustomerSide
         CT[Customer Terminal]
         EF[Enter Feedback]
