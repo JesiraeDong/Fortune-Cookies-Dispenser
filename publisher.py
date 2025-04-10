@@ -1,69 +1,110 @@
-import paho.mqtt.client as mqtt
-import json
+import socketio
+import time
 from datetime import datetime
 
-# MQTT Configuration
-mqtt_broker = "localhost"
-mqtt_port = 1883
-mqtt_topic = "sentiment/feedback"
+# Initialize Socket.IO client with reconnection settings
+sio = socketio.Client(reconnection=True, reconnection_attempts=5, reconnection_delay=1)
 
-def on_connect(client, userdata, flags, rc):
-    if rc == 0:
-        print("Connected to MQTT broker successfully")
-    else:
-        print(f"Failed to connect to MQTT broker with code: {rc}")
+@sio.event
+def connect():
+    print("✅ Connected to server!")
 
-def submit_feedback(client, text, sentiment):
-    feedback_data = {
-        'text': text,
-        'sentiment': sentiment,
-        'timestamp': datetime.now().isoformat()
-    }
-    client.publish(mqtt_topic, json.dumps(feedback_data))
-    print(f"Published feedback: {text} ({sentiment})")
+@sio.event
+def disconnect():
+    print("❌ Disconnected from server - attempting to reconnect...")
+
+@sio.event
+def connect_error(data):
+    print(f"❌ Connection error: {data}")
+
+@sio.event
+def connection_response(data):
+    print(f"🔄 Server response: {data['data']}")
+
+@sio.event
+def feedback_processed(data):
+    """Handle processed feedback response from server"""
+    try:
+        # Extract feedback data
+        feedback = data.get('feedback', {})
+        sentiment = feedback.get('sentiment', 'Unknown')
+        timestamp = feedback.get('timestamp', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        
+        # Extract statistics
+        stats = data.get('stats', {})
+        total = stats.get('total', 0)
+        positive = stats.get('positive', 0)
+        neutral = stats.get('neutral', 0)
+        negative = stats.get('negative', 0)
+        
+        # Define suggested tips based on sentiment
+        suggested_tips = {
+            "Positive": "💖 Suggested Tip: 25%, 20%, or Custom",
+            "Neutral": "🌿 Suggested Tip: 20%, 18%, or Custom",
+            "Negative": "💙 Suggested Tip: 15% or Custom"
+        }
+        
+        # Print feedback information
+        print(f"\n✨ Feedback processed at {timestamp}")
+        print(f"📊 Sentiment: {sentiment}")
+        print(f"💰 {suggested_tips.get(sentiment, '💫 Suggested Tip: Custom')}")
+        print(f"🍪 Fortune cookie has been dispensed!")
+        print(f"📈 Statistics: {total} total, {positive} positive, {neutral} neutral, {negative} negative")
+        
+    except Exception as e:
+        print(f"❌ Error processing feedback response: {str(e)}")
+        print(f"Raw data received: {data}")
+
+def submit_feedback(feedback_text):
+    """Submit feedback via WebSocket."""
+    try:
+        if not sio.connected:
+            print("Reconnecting to server...")
+            sio.connect('http://localhost:5001')
+            
+        sio.emit('new_feedback', {'feedback': feedback_text})
+        print(f"📤 Feedback sent at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        return True
+    except Exception as e:
+        print(f"❌ Error sending feedback: {str(e)}")
+        return False
 
 def main():
-    # Create MQTT client with the latest API version
-    client = mqtt.Client(protocol=mqtt.MQTTv5)
-    client.on_connect = on_connect
+    print("🔄 Restaurant Feedback Publisher")
+    print("--------------------------------")
+    print("Type 'quit' to exit\n")
     
     try:
-        # Connect to MQTT broker
-        print("Connecting to MQTT broker...")
-        client.connect(mqtt_broker, mqtt_port, 60)
-        client.loop_start()
+        # Connect to the Flask-SocketIO server
+        sio.connect('http://localhost:5001')
         
         while True:
-            print("\nEnter feedback (or 'quit' to exit):")
-            text = input("Feedback text: ")
-            if text.lower() == 'quit':
+            try:
+                feedback = input("\n📝 Enter customer feedback: ").strip()
+                
+                if feedback.lower() == 'quit':
+                    print("\n👋 Goodbye!")
+                    break
+                    
+                if feedback:
+                    submit_feedback(feedback)
+                else:
+                    print("❌ Error: Feedback cannot be empty")
+                
+                time.sleep(1)  # Small delay between submissions
+                
+            except KeyboardInterrupt:
+                print("\n👋 Goodbye!")
                 break
+            except Exception as e:
+                print(f"❌ Error: {str(e)}")
+                time.sleep(2)  # Wait before retrying
                 
-            print("\nSelect sentiment:")
-            print("1. Positive")
-            print("2. Neutral")
-            print("3. Negative")
-            
-            choice = input("Enter choice (1-3):")
-            sentiment_map = {
-                '1': 'positive',
-                '2': 'neutral',
-                '3': 'negative'
-            }
-            
-            if choice in sentiment_map:
-                sentiment = sentiment_map[choice]
-                submit_feedback(client, text, sentiment)
-            else:
-                print("Invalid choice. Please try again.")
-                
-    except KeyboardInterrupt:
-        print("\nExiting...")
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"❌ Error connecting to server: {str(e)}")
     finally:
-        client.loop_stop()
-        client.disconnect()
+        if sio.connected:
+            sio.disconnect()
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main() 
