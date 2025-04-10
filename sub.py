@@ -337,12 +337,21 @@ def handle_feedback(data):
             neutral = sum(1 for f in all_feedbacks if f.sentiment == 'Neutral')
             negative = sum(1 for f in all_feedbacks if f.sentiment == 'Negative')
             
+            # Define suggested tips based on sentiment
+            suggested_tips = {
+                "Positive": "💖 Suggested Tip: 25%, 20%, or Custom",
+                "Neutral": "🌿 Suggested Tip: 20%, 18%, or Custom",
+                "Negative": "💙 Suggested Tip: 15% or Custom"
+            }
+            
             # Emit the processed feedback and updated charts to all connected clients
             response_data = {
                 'feedback': {
                     'text': feedback_text,
                     'sentiment': sentiment,
-                    'timestamp': datetime.now().isoformat()
+                    'timestamp': datetime.now().isoformat(),
+                    'suggested_tip': suggested_tips.get(sentiment, '💫 Suggested Tip: Custom'),
+                    'cookie_message': '🍪 Fortune cookie has been dispensed!'
                 },
                 'stats': {
                     'total': total,
@@ -350,11 +359,17 @@ def handle_feedback(data):
                     'neutral': neutral,
                     'negative': negative
                 },
-                'pie_chart': pie_chart,
-                'line_chart': line_chart
+                'charts': {
+                    'pie': pie_chart,
+                    'line': line_chart
+                }
             }
-            emit('feedback_processed', response_data, broadcast=True)
-            logger.info('Feedback processing complete, notification sent')
+            
+            # Emit feedback_processed event to the sender
+            emit('feedback_processed', response_data)
+            
+            # Emit update_charts event to all clients
+            emit('update_charts', response_data, broadcast=True)
             
         except Exception as e:
             logger.error(f'Error processing feedback: {str(e)}')
