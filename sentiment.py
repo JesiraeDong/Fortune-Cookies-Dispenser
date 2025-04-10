@@ -12,12 +12,6 @@ client = OpenAI(
 def analyze_sentiment(text):
     """Analyze sentiment of text using OpenAI's GPT-3.5-turbo model with enhanced context awareness."""
     try:
-        # Quick check for simple positive statements
-        simple_positive = ["happy", "great", "good", "excellent", "amazing", "love", "enjoyed", "delicious", "perfect"]
-        if any(word in text.lower() for word in simple_positive):
-            logger.info(f"Simple positive statement detected: '{text}'")
-            return "Positive"
-            
         prompt = f"""Analyze the sentiment of this restaurant feedback. Consider the emotional tone, specific comments about food, service, and overall experience.
 
         Respond with EXACTLY one word: 'Positive', 'Neutral', or 'Negative'.
@@ -29,7 +23,6 @@ def analyze_sentiment(text):
         - Strong positive emotions ("happy", "pleased", "impressed")
         - Explicit praise ("service was excellent", "food was amazing")
         - Clear intent to return ("will come back", "recommend")
-        - Simple positive statements ("happy customer", "great service")
         
         NEGATIVE - Use when feedback expresses:
         - Any form of dissatisfaction or disappointment
@@ -49,8 +42,6 @@ def analyze_sentiment(text):
         Positive: "The food was delicious and service was excellent"
         Positive: "I love the atmosphere here"
         Positive: "Best meal I've had in a long time"
-        Positive: "Happy customer" (simple positive statement)
-        Positive: "Great service" (simple positive statement)
         Negative: "The food was too salty"
         Negative: "Service was slow and food was cold"
         Negative: "Not worth the price"
@@ -66,7 +57,7 @@ def analyze_sentiment(text):
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "You are a restaurant feedback analyzer. Your task is to classify feedback as Positive, Negative, or Neutral based on the emotional tone and specific comments. Be decisive - classify simple positive statements as Positive, mild complaints as Negative, and only use Neutral when there is truly no clear sentiment."},
+                {"role": "system", "content": "You are a restaurant feedback analyzer. Your task is to classify feedback as Positive, Negative, or Neutral based on the emotional tone and specific comments. Be decisive - classify mild complaints and suggestions as Negative, and only use Neutral when there is truly no clear sentiment."},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=10,
@@ -91,11 +82,6 @@ def fallback_sentiment_analysis(text):
     """Enhanced keyword-based sentiment analysis as a fallback."""
     text = text.lower()
     
-    # Quick check for simple positive statements
-    simple_positive = ["happy", "great", "good", "excellent", "amazing", "love", "enjoyed", "delicious", "perfect"]
-    if any(word in text for word in simple_positive):
-        return "Positive"
-    
     # Expanded keyword lists with weights
     positive_words = {
         'excellent': 2.0, 'amazing': 2.0, 'delicious': 2.0, 'perfect': 2.0,
@@ -103,12 +89,7 @@ def fallback_sentiment_analysis(text):
         'fresh': 1.0, 'tasty': 1.0, 'friendly': 1.0, 'quick': 1.0,
         'recommend': 1.0, 'clean': 1.0, 'authentic': 1.0, 'favorite': 1.0,
         'outstanding': 1.5, 'brilliant': 1.5, 'satisfied': 1.0, 'pleased': 1.0,
-        'impressed': 1.5, 'memorable': 1.0, 'delightful': 1.5,
-        'happy': 2.0,  # Added with high weight
-        'fantastic': 2.0,
-        'wonderful': 2.0,
-        'best': 2.0,
-        'awesome': 2.0
+        'impressed': 1.5, 'memorable': 1.0, 'delightful': 1.5
     }
     
     negative_words = {
@@ -187,10 +168,6 @@ def fallback_sentiment_analysis(text):
     # Special handling for "could be" and "should be" statements
     if any(phrase in text for phrase in ["could be", "should be"]):
         neg_score += 1.0  # Boost negative score for improvement suggestions
-    
-    # Special handling for simple positive statements
-    if any(word in text for word in ["happy", "great", "good", "excellent"]):
-        pos_score += 2.0  # Boost positive score for simple positive statements
     
     # Determine sentiment based on scores
     if pos_score > neg_score and pos_score > neu_score:
