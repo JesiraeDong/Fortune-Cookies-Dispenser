@@ -1,104 +1,89 @@
-# Business Dashboard
+# Fortune Cookie Dispenser
 
-A real-time sentiment analysis dashboard for restaurant feedback using Flask, SocketIO, and Plotly.
+A Raspberry Pi-based fortune cookie dispenser that responds to customer feedback sentiment.
 
-## Features
+## Hardware Requirements
 
-- Real-time sentiment analysis of customer feedback
-- Interactive visualizations:
-  - Sentiment distribution pie chart
-  - Sentiment trend line chart
-- WebSocket-based live updates
-- Responsive dashboard design
+- Raspberry Pi
+- Motor (connected to GPIO 17)
+- LED (connected to GPIO 18)
+- Button (connected to GPIO 27)
+- MQTT Broker (Mosquitto)
 
-## Customer Feedback Flow Chart
+## Software Requirements
 
-```mermaid
-flowchart LR
-    %% Define subgraphs with styling
-    subgraph CustomerSide["Customer Side"]
-        style CustomerSide fill:#e6f7ff,stroke:#1890ff,stroke-width:2px
-        CT["Customer Terminal"]
-        EF["Enter Feedback"]
-        SF["Send Feedback"]
-    end
+- Python 3.x
+- paho-mqtt
+- RPi.GPIO
+- Mosquitto MQTT Broker
 
-    subgraph Backend["Backend"]
-        style Backend fill:#f6ffed,stroke:#52c41a,stroke-width:2px
-        FSS["Flask SocketIO Server"]
-        RF["Receive Feedback"]
-        SA["Sentiment Analysis"]
-        STF["Store Feedback"]
-        ER["Emit Result"]
-        TS["Trigger Servo"]
-    end
+## Installation
 
-    subgraph BusinessSide["Business Side"]
-        style BusinessSide fill:#fff1f0,stroke:#f5222d,stroke-width:2px
-        BD["Business Dashboard"]
-        DV["Display Visualizations"]
-        AD["Access Dashboard"]
-    end
-
-    %% Define connections with labels
-    CT --> EF
-    EF --> SF
-    SF -->|"Feedback via WebSocket"| FSS
-    FSS --> RF
-    RF -->|"Sentiment Analysis via OpenAI"| SA
-    SA -->|"Store in SQLite"| STF
-    STF --> ER
-    ER -->|"Trigger Servo (optional)"| TS
-    ER -->|"Update Dashboard"| BD
-    BD --> DV
-    DV -->|"Access via /dashboard route"| AD
-    ER -->|"Emit Result"| CT
-
-    %% Apply styling to nodes
-    classDef terminal fill:#e6f7ff,stroke:#1890ff,stroke-width:2px
-    classDef server fill:#f6ffed,stroke:#52c41a,stroke-width:2px
-    classDef dashboard fill:#fff1f0,stroke:#f5222d,stroke-width:2px
-    classDef process fill:#f9f0ff,stroke:#722ed1,stroke-width:1px
-
-    %% Apply classes to nodes
-    class CT,EF,SF terminal
-    class FSS server
-    class RF,SA,STF,ER,TS process
-    class BD,DV,AD dashboard
+1. Install required system packages:
+```bash
+sudo apt update
+sudo apt install python3-venv python3-full mosquitto mosquitto-clients
 ```
 
-## Setup
-
-1. Install dependencies:
+2. Create and activate virtual environment:
 ```bash
-pip install -r requirements.txt
+python3 -m venv venv
+source venv/bin/activate
 ```
 
-2. Run the subscriber server:
+3. Install Python packages:
 ```bash
-python sub.py
+pip install paho-mqtt RPi.GPIO
 ```
 
-3. Run the publisher to submit feedback:
+## Usage
+
+1. Start the MQTT broker:
 ```bash
+sudo systemctl start mosquitto
+```
+
+2. Run the microcontroller script:
+```bash
+sudo venv/bin/python microcontroller.py
+```
+
+3. In a separate terminal, run the publisher:
+```bash
+cd ~/fortune_cookie
+source venv/bin/activate
 python publisher.py
 ```
 
-4. Access the dashboard at http://localhost:5001
+4. Enter feedback and select sentiment:
+   - 1: Positive (triggers motor)
+   - 2: Neutral (triggers LED)
+   - 3: Negative (no action)
 
-## Project Structure
+## Testing
 
-- `sub.py`: Flask server with WebSocket support and dashboard
-- `publisher.py`: Feedback submission interface
-- `sentiment.py`: Sentiment analysis module
-- `models.py`: Database models
-- `templates/`: HTML templates
-- `static/`: CSS, JavaScript, and other static files
+To test the motor connection:
+```bash
+sudo venv/bin/python test_motor.py
+```
 
-## Technologies Used
+## Troubleshooting
 
-- Flask
-- Flask-SocketIO
-- Plotly
-- SQLAlchemy
-- OpenAI GPT-3.5 
+1. Check MQTT broker status:
+```bash
+sudo systemctl status mosquitto
+```
+
+2. Verify GPIO connections:
+- Motor: GPIO 17
+- LED: GPIO 18
+- Button: GPIO 27
+
+3. Check permissions:
+```bash
+sudo usermod -a -G gpio $USER
+```
+
+## License
+
+MIT License 
