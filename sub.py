@@ -11,14 +11,47 @@ from datetime import datetime
 import logging
 import plotly.graph_objects as go
 from flask_cors import CORS
+import socket
+import paho.mqtt.client as mqtt
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# MQTT Configuration
+mqtt_broker = "localhost"
+mqtt_port = 1883
+mqtt_topic = "feedback/updates"
+
+# MQTT Callback functions
+def on_connect(client, userdata, flags, rc):
+    logger.info(f"Connected to MQTT broker with result code {rc}")
+    client.subscribe(mqtt_topic)
+
+def on_message(client, userdata, msg):
+    try:
+        logger.info(f"Received MQTT message: {msg.payload.decode()}")
+        # Handle MQTT message if needed
+    except Exception as e:
+        logger.error(f"Error processing MQTT message: {str(e)}")
+
+# Initialize MQTT client
+client = mqtt.Client()
+client.on_connect = on_connect
+client.on_message = on_message
+
+# Connect to MQTT broker
+try:
+    client.connect(mqtt_broker, mqtt_port, 60)
+    client.loop_start()
+    logger.info("Connected to MQTT broker")
+except Exception as e:
+    logger.error(f"Failed to connect to MQTT broker: {str(e)}")
+    logger.info("Continuing without MQTT broker connection")
+
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
-app.config['SECRET_KEY'] = 'your-secret-key-here'
+app.config['SECRET_KEY'] = 'secret!'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///feedback.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -30,7 +63,8 @@ socketio = SocketIO(
     engineio_logger=True,
     cors_allowed_origins="*",
     ping_timeout=60,
-    ping_interval=25
+    ping_interval=25,
+    host='0.0.0.0'  # Explicitly bind to all interfaces
 )
 
 # Initialize the database
@@ -39,6 +73,9 @@ db.init_app(app)
 # Create the database tables
 with app.app_context():
     db.create_all()
+
+# Get local IP address
+logger.info("Server running on all interfaces (0.0.0.0)")
 
 def create_charts():
     """Create charts for the dashboard using plotly."""
@@ -365,6 +402,14 @@ def handle_feedback(data):
                 }
             }
             
+            # Emit servo rotation event to all clients
+            logger.info('Emitting rotate_servo event')
+            logger.info(f'Broadcasting rotate_servo event to all clients at {datetime.now().isoformat()}')
+            
+            # Use socketio.emit instead of emit to ensure proper broadcasting
+            socketio.emit('rotate_servo', {'timestamp': datetime.now().isoformat()}, broadcast=True)
+            logger.info('rotate_servo event emitted successfully')
+            
             # Emit feedback_processed event to the sender
             emit('feedback_processed', response_data)
             
@@ -407,4 +452,7 @@ def dashboard():
 
 if __name__ == '__main__':
     logger.info('Starting Flask-SocketIO server...')
-    socketio.run(app, debug=True, port=5001) 
+    # Skip DNS resolution and use 0.0.0.0 directly
+    logger.info("Server running on all interfaces (0.0.0.0)")
+    # Explicitly bind to all interfaces
+    socketio.run(app, debug=False, port=5001, host='0.0.0.0', allow_unsafe_werkzeug=True) 

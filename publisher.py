@@ -5,8 +5,8 @@ from datetime import datetime
 # Initialize Socket.IO client with reconnection settings
 sio = socketio.Client(reconnection=True, reconnection_attempts=5, reconnection_delay=1)
 
-# Flag to track if feedback has been processed
-feedback_processed = False
+# Event to track when feedback is processed
+feedback_received = False
 
 @sio.event
 def connect():
@@ -27,11 +27,13 @@ def connection_response(data):
 @sio.event
 def feedback_processed(data):
     """Handle processed feedback response from server"""
-    global feedback_processed
+    global feedback_received
     try:
         feedback = data.get('feedback', {})
         sentiment = feedback.get('sentiment', 'Unknown')
         timestamp = feedback.get('timestamp', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        suggested_tip = feedback.get('suggested_tip', '')
+        cookie_message = feedback.get('cookie_message', '')
         
         stats = data.get('stats', {})
         total = stats.get('total', 0)
@@ -39,48 +41,40 @@ def feedback_processed(data):
         neutral = stats.get('neutral', 0)
         negative = stats.get('negative', 0)
         
-        # Define suggested tips based on sentiment
-        suggested_tips = {
-            "Positive": "💖 Suggested Tip: 25%, 20%, or Custom",
-            "Neutral": "🌿 Suggested Tip: 20%, 18%, or Custom",
-            "Negative": "💙 Suggested Tip: 15% or Custom"
-        }
-        
         print(f"\n✨ Feedback processed at {timestamp}")
         print(f"📊 Sentiment: {sentiment}")
-        print(f"💰 {suggested_tips.get(sentiment, '💫 Suggested Tip: Custom')}")
-        print(f"🍪 Fortune cookie has been dispensed!")
-        print(f"📈 Statistics: {total} total, {positive} positive, {neutral} neutral, {negative} negative")
+        print(f"💰 {suggested_tip}")
+        print(f"{cookie_message}")
+        print(f"📈 Statistics: {total} total, {positive} positive, {neutral} neutral, {negative} negative\n")
         
-        # Set the flag to indicate feedback has been processed
-        feedback_processed = True
-        
+        feedback_received = True
     except Exception as e:
         print(f"❌ Error processing feedback response: {str(e)}")
-        feedback_processed = True  # Set flag even on error to prevent hanging
+        feedback_received = True
 
 def submit_feedback(feedback_text):
     """Submit feedback via WebSocket."""
-    global feedback_processed
+    global feedback_received
     try:
         if not sio.connected:
             print("Reconnecting to server...")
             sio.connect('http://localhost:5001')
         
-        # Reset the feedback processed flag
-        feedback_processed = False
-            
+        # Reset the feedback received flag
+        feedback_received = False
+        
+        # Send the feedback
         sio.emit('new_feedback', {'feedback': feedback_text})
         print(f"📤 Feedback sent at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         
-        # Wait for feedback to be processed (with timeout)
-        timeout = 10  # seconds
+        # Wait for feedback to be processed
+        timeout = 5  # seconds
         start_time = time.time()
-        while not feedback_processed and time.time() - start_time < timeout:
+        while not feedback_received and time.time() - start_time < timeout:
             time.sleep(0.1)
-            
-        if not feedback_processed:
-            print("⚠️ Warning: Feedback processing timed out")
+        
+        if not feedback_received:
+            print("⚠️ Waiting for server response...")
             
         return True
     except Exception as e:
