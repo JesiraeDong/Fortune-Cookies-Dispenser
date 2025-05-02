@@ -1,7 +1,7 @@
 import eventlet
 eventlet.monkey_patch()
 
-from flask import Flask, render_template
+from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit
 from models import db, Feedback
 from sentiment import analyze_sentiment
@@ -15,7 +15,10 @@ import socket
 import paho.mqtt.client as mqtt
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.DEBUG,  # Change to DEBUG level
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 # MQTT Configuration
@@ -64,7 +67,9 @@ socketio = SocketIO(
     cors_allowed_origins="*",
     ping_timeout=60,
     ping_interval=25,
-    host='0.0.0.0'  # Explicitly bind to all interfaces
+    host='0.0.0.0',  # Explicitly bind to all interfaces
+    always_connect=True,  # Allow connections from any origin
+    transports=['websocket', 'polling']  # Allow both WebSocket and polling
 )
 
 # Initialize the database
@@ -331,94 +336,112 @@ def create_charts():
     
     return pie_chart_data, line_chart_data
 
+@socketio.on_error()
+def error_handler(e):
+    """Handle SocketIO errors"""
+    logger.error(f"SocketIO error: {str(e)}")
+    return False
+
+@socketio.on_error_default
+def default_error_handler(e):
+    """Handle default SocketIO errors"""
+    logger.error(f"Default SocketIO error: {str(e)}")
+    return False
+
 @socketio.on('connect')
 def handle_connect():
     """Handle client connection"""
-    logger.info('Client connected')
+    logger.debug('Client attempting to connect')
+    logger.info(f'Client connected from {request.remote_addr}')
     emit('connection_response', {'data': 'Connected to server'})
 
 @socketio.on('disconnect')
 def handle_disconnect():
     """Handle client disconnection"""
-    logger.info('Client disconnected')
+    logger.info(f'Client disconnected from {request.remote_addr}')
 
 @socketio.on('new_feedback')
 def handle_feedback(data):
     """Handle incoming feedback via WebSocket"""
-    logger.info('Received new feedback')
-    feedback_text = data.get('feedback')
-    if feedback_text:
-        try:
-            # Analyze sentiment
-            sentiment = analyze_sentiment(feedback_text)
-            logger.info(f'Sentiment analysis result: {sentiment}')
-            
-            # Create new feedback entry
-            feedback = Feedback(
-                text=feedback_text,
-                sentiment=sentiment
-            )
-            
-            # Save to database
-            db.session.add(feedback)
-            db.session.commit()
-            logger.info('Feedback saved to database')
-            
-            # Get updated charts
-            pie_chart, line_chart = create_charts()
-            
-            # Get all feedback for stats
-            all_feedbacks = Feedback.query.all()
-            total = len(all_feedbacks)
-            positive = sum(1 for f in all_feedbacks if f.sentiment == 'Positive')
-            neutral = sum(1 for f in all_feedbacks if f.sentiment == 'Neutral')
-            negative = sum(1 for f in all_feedbacks if f.sentiment == 'Negative')
-            
-            # Define suggested tips based on sentiment
-            suggested_tips = {
-                "Positive": "💖 Suggested Tip: 25%, 20%, or Custom",
-                "Neutral": "🌿 Suggested Tip: 20%, 18%, or Custom",
-                "Negative": "💙 Suggested Tip: 15% or Custom"
+    logger.debug(f'Received feedback data: {data}')
+    try:
+        feedback_text = data.get('feedback', '')
+        logger.info(f'Processing feedback: {feedback_text}')
+        
+        # Analyze sentiment
+        sentiment = analyze_sentiment(feedback_text)
+        logger.info(f'Analyzed sentiment: {sentiment}')
+        
+        # Create new feedback entry
+        new_feedback = Feedback(
+            text=feedback_text,
+            sentiment=sentiment,
+            timestamp=datetime.now()
+        )
+        logger.info('Created new feedback entry')
+        
+        # Save to database
+        db.session.add(new_feedback)
+        db.session.commit()
+        logger.info('Saved feedback to database')
+        
+        # Get updated charts
+        pie_chart, line_chart = create_charts()
+        logger.debug('Charts updated')
+        
+        # Get all feedback for stats
+        all_feedbacks = Feedback.query.all()
+        total = len(all_feedbacks)
+        positive = sum(1 for f in all_feedbacks if f.sentiment == 'Positive')
+        neutral = sum(1 for f in all_feedbacks if f.sentiment == 'Neutral')
+        negative = sum(1 for f in all_feedbacks if f.sentiment == 'Negative')
+        
+        # Define suggested tips based on sentiment
+        suggested_tips = {
+            "Positive": "💖 Suggested Tip: 25%, 20%, or Custom",
+            "Neutral": "🌿 Suggested Tip: 20%, 18%, or Custom",
+            "Negative": "�� Suggested Tip: 15% or Custom"
+        }
+        
+        # Prepare feedback data
+        feedback_data = {
+            'text': feedback_text,
+            'sentiment': sentiment,
+            'timestamp': datetime.now().isoformat(),
+            'suggested_tip': suggested_tips.get(sentiment, '💫 Suggested Tip: Custom'),
+            'cookie_message': '🍪 Fortune cookie has been dispensed!'
+        }
+        
+        # Prepare response data
+        response_data = {
+            'feedback': feedback_data,
+            'stats': {
+                'total': total,
+                'positive': positive,
+                'neutral': neutral,
+                'negative': negative
+            },
+            'charts': {
+                'pie': pie_chart,
+                'line': line_chart
             }
-            
-            # Emit the processed feedback and updated charts to all connected clients
-            response_data = {
-                'feedback': {
-                    'text': feedback_text,
-                    'sentiment': sentiment,
-                    'timestamp': datetime.now().isoformat(),
-                    'suggested_tip': suggested_tips.get(sentiment, '💫 Suggested Tip: Custom'),
-                    'cookie_message': '🍪 Fortune cookie has been dispensed!'
-                },
-                'stats': {
-                    'total': total,
-                    'positive': positive,
-                    'neutral': neutral,
-                    'negative': negative
-                },
-                'charts': {
-                    'pie': pie_chart,
-                    'line': line_chart
-                }
-            }
-            
-            # Emit servo rotation event to all clients
-            logger.info('Emitting rotate_servo event')
-            logger.info(f'Broadcasting rotate_servo event to all clients at {datetime.now().isoformat()}')
-            
-            # Use socketio.emit instead of emit to ensure proper broadcasting
-            socketio.emit('rotate_servo', {'timestamp': datetime.now().isoformat()}, broadcast=True)
-            logger.info('rotate_servo event emitted successfully')
-            
-            # Emit feedback_processed event to the sender
-            emit('feedback_processed', response_data)
-            
-            # Emit update_charts event to all clients
-            emit('update_charts', response_data, broadcast=True)
-            
-        except Exception as e:
-            logger.error(f'Error processing feedback: {str(e)}')
-            emit('feedback_error', str(e))
+        }
+        
+        logger.info('Emitting rotate_servo event')
+        socketio.emit('rotate_servo', {'timestamp': datetime.now().isoformat()}, broadcast=True)
+        logger.info('rotate_servo event emitted')
+        
+        logger.info('Sending feedback_processed response')
+        emit('feedback_processed', response_data)
+        logger.info('feedback_processed response sent')
+        
+        logger.info('Broadcasting chart updates')
+        emit('update_charts', response_data, broadcast=True)
+        logger.info('Chart updates broadcasted')
+        
+    except Exception as e:
+        logger.error(f'Error processing feedback: {str(e)}')
+        emit('feedback_error', str(e))
 
 @app.route('/')
 @app.route('/dashboard')
@@ -452,7 +475,5 @@ def dashboard():
 
 if __name__ == '__main__':
     logger.info('Starting Flask-SocketIO server...')
-    # Skip DNS resolution and use 0.0.0.0 directly
     logger.info("Server running on all interfaces (0.0.0.0)")
-    # Explicitly bind to all interfaces
-    socketio.run(app, debug=False, port=5001, host='0.0.0.0', allow_unsafe_werkzeug=True) 
+    socketio.run(app, debug=True, port=5001, host='0.0.0.0', allow_unsafe_werkzeug=True) 

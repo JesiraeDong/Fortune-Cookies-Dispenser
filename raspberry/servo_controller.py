@@ -73,7 +73,7 @@ def main():
     try:
         # Connect to the Flask-SocketIO server
         # Using the server's IP address
-        server_url = 'http://10.197.135.18:5001'
+        server_url = 'http://172.28.229.89:5001'
         print(f"🔄 Connecting to server at {server_url}...")
         sio.connect(server_url)
         

@@ -1,34 +1,56 @@
 import socketio
 import time
 from datetime import datetime
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 # Initialize Socket.IO client with reconnection settings
-sio = socketio.Client(reconnection=True, reconnection_attempts=5, reconnection_delay=1)
+sio = socketio.Client(
+    reconnection=True,
+    reconnection_attempts=5,
+    reconnection_delay=1,
+    logger=True,
+    engineio_logger=True,
+    request_timeout=10,
+    http_session=None,
+    ssl_verify=False
+)
 
 # Event to track when feedback is processed
 feedback_received = False
 
 @sio.event
 def connect():
-    print("✅ Connected to server!")
+    logger.info("✅ Connected to server!")
+    logger.debug("Connection established with server")
 
 @sio.event
 def disconnect():
-    print("❌ Disconnected from server - attempting to reconnect...")
+    logger.info("❌ Disconnected from server - attempting to reconnect...")
+    logger.debug("Disconnected from server, will attempt to reconnect")
 
 @sio.event
 def connect_error(data):
-    print(f"❌ Connection error: {data}")
+    logger.error(f"❌ Connection error: {data}")
+    logger.debug(f"Connection error details: {data}")
 
 @sio.event
 def connection_response(data):
-    print(f"🔄 Server response: {data['data']}")
+    logger.info(f"🔄 Server response: {data['data']}")
+    logger.debug(f"Connection response details: {data}")
 
 @sio.event
 def feedback_processed(data):
     """Handle processed feedback response from server"""
     global feedback_received
     try:
+        logger.debug(f"Received feedback_processed event: {data}")
         feedback = data.get('feedback', {})
         sentiment = feedback.get('sentiment', 'Unknown')
         timestamp = feedback.get('timestamp', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
@@ -49,7 +71,7 @@ def feedback_processed(data):
         
         feedback_received = True
     except Exception as e:
-        print(f"❌ Error processing feedback response: {str(e)}")
+        logger.error(f"❌ Error processing feedback response: {str(e)}")
         feedback_received = True
 
 def submit_feedback(feedback_text):
@@ -57,13 +79,14 @@ def submit_feedback(feedback_text):
     global feedback_received
     try:
         if not sio.connected:
-            print("Reconnecting to server...")
-            sio.connect('http://localhost:5001')
+            logger.info("Reconnecting to server...")
+            sio.connect('http://10.197.135.18:5001')
         
         # Reset the feedback received flag
         feedback_received = False
         
         # Send the feedback
+        logger.debug(f"Emitting new_feedback event with data: {{'feedback': {feedback_text}}}")
         sio.emit('new_feedback', {'feedback': feedback_text})
         print(f"📤 Feedback sent at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         
@@ -74,11 +97,12 @@ def submit_feedback(feedback_text):
             time.sleep(0.1)
         
         if not feedback_received:
+            logger.warning("⚠️ No response received from server within timeout period")
             print("⚠️ Waiting for server response...")
             
         return True
     except Exception as e:
-        print(f"❌ Error sending feedback: {str(e)}")
+        logger.error(f"❌ Error sending feedback: {str(e)}")
         return False
 
 def main():
@@ -88,7 +112,8 @@ def main():
     
     try:
         # Connect to the Flask-SocketIO server
-        sio.connect('http://localhost:5001')
+        logger.info("Connecting to server...")
+        sio.connect('http://10.197.135.18:5001')
         
         while True:
             try:
@@ -107,11 +132,11 @@ def main():
                 print("\n👋 Goodbye!")
                 break
             except Exception as e:
-                print(f"❌ Error: {str(e)}")
+                logger.error(f"❌ Error: {str(e)}")
                 time.sleep(2)  # Wait before retrying
                 
     except Exception as e:
-        print(f"❌ Error connecting to server: {str(e)}")
+        logger.error(f"❌ Error connecting to server: {str(e)}")
     finally:
         if sio.connected:
             sio.disconnect()
